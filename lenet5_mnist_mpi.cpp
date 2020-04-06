@@ -14,7 +14,7 @@
 #include <torch/torch.h>
 
 // global constant
-const int ROOT = 0;
+const int ROOT = 0;       // this is the master
 const int DONE = 999999;  // the "done" flag. choose some special number
 const int NOT_DONE = 1;   // some flag different from "done"
 
@@ -283,17 +283,12 @@ void train_master(Net& model,
       }
     }
 
-    // bookkeep the number of digested g in total
-    counter += nreceived;
-    if (screen_debug) {
-      printf("master %d: total number of digested g = %d\n", myrank, counter);
-    }
-    
     // compute new w based on received g
     for (int i = 0; i < nreceived; i++) {
 
       // compute new w based on received g
       optimizer.step(gg[idx_of_received[i]], w);
+      ++counter; // bookkeep the number of digested g in total
 
       // print training set loss and accuracy (time consuming)
       if (check_progress && counter % num_iter_per_epoch == 0) {
@@ -304,7 +299,12 @@ void train_master(Net& model,
         test(model, device, dataloader, dataset_size, "train set");
       }
     }
-
+    
+    // screen debug
+    if (screen_debug) {
+      printf("master %d: total number of digested g = %d\n", myrank, counter);
+    }
+    
     // send new w to select workers and post new nonblocking receives
     for (int i = 0; i < nreceived; i++) {
       if (counter < maxiter) { // if not done
@@ -381,7 +381,7 @@ void train_worker(Net& model,
         optimizer.unpack(w);
       }
       initial = false;
-      // [black art] For unknown reasons, using the initial w in the
+      // [black art] for unknown reasons, using the initial w in the
       // communication buffer to set parameters in model does not work
        
       // reset gradient
