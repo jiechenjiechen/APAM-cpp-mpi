@@ -25,7 +25,6 @@ Under the code directory, generate makefile. The `/absolute/path/to/libtorch` be
 mkdir build
 cd build
 cmake -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_PREFIX_PATH=/absolute/path/to/libtorch ..
-make
 ```
 
 Compile the code.  Example with `apam_mpi_logit_mnist`:
