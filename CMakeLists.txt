@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
-project(lenet5_mnist_mpi)
+project(apam_mpi)
 
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 ${TORCH_CXX_FLAGS}")
@@ -16,7 +16,17 @@ if (DOWNLOAD_LENET5_MNIST)
   endif()
 endif()
 
-add_executable(lenet5_mnist_mpi lenet5_mnist_mpi.cpp)
-target_compile_features(lenet5_mnist_mpi PUBLIC cxx_range_for)
-target_link_libraries(lenet5_mnist_mpi ${TORCH_LIBRARIES})
-set_property(TARGET lenet5_mnist_mpi PROPERTY CXX_STANDARD 14)
+add_executable(apam_mpi_logit_mnist apam_mpi_logit_mnist.cpp)
+target_compile_features(apam_mpi_logit_mnist PUBLIC cxx_range_for)
+target_link_libraries(apam_mpi_logit_mnist ${TORCH_LIBRARIES})
+set_property(TARGET apam_mpi_logit_mnist PROPERTY CXX_STANDARD 14)
+
+add_executable(apam_mpi_mlp_mnist apam_mpi_mlp_mnist.cpp)
+target_compile_features(apam_mpi_mlp_mnist PUBLIC cxx_range_for)
+target_link_libraries(apam_mpi_mlp_mnist ${TORCH_LIBRARIES})
+set_property(TARGET apam_mpi_mlp_mnist PROPERTY CXX_STANDARD 14)
+
+add_executable(apam_mpi_lenet5_mnist apam_mpi_lenet5_mnist.cpp)
+target_compile_features(apam_mpi_lenet5_mnist PUBLIC cxx_range_for)
+target_link_libraries(apam_mpi_lenet5_mnist ${TORCH_LIBRARIES})
+set_property(TARGET apam_mpi_lenet5_mnist PROPERTY CXX_STANDARD 14)
