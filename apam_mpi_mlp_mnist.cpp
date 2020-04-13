@@ -58,9 +58,10 @@ public:
   ~APAM();
 
   // the meat
-  void unpack(float *w); // called by worker. unpack from float array to tensor
-  void pack(float *g);   // called by worker. pack from tensor to float array
-  void zero_grad(void);  // called by worker. conform with pytorch
+  void unpack_w(float *w); // unpack from float array to tensor
+  void pack_w(float *w);   // pack from tensor to float array
+  void pack_g(float *g);   // pack from tensor to float array
+  void zero_grad(void);    // called by worker. conform with pytorch
   void step(float *g, float *w); // called by master. conform with pytorch
 
   // utility functions
@@ -137,7 +138,7 @@ reset(void) {
 }
 
 void APAM::
-unpack(float *w) {
+unpack_w(float *w) {
   float *tw = NULL;
   int offset = 0;
   for (int i = 0; i < num_set; i++) {
@@ -148,7 +149,18 @@ unpack(float *w) {
 }
 
 void APAM::
-pack(float *g) {
+pack_w(float *w) {
+  float *tw = NULL;
+  int offset = 0;
+  for (int i = 0; i < num_set; i++) {
+    tw = static_cast<float*>(_model.parameters()[i].storage().data());
+    memcpy(w+offset, tw, set_size[i]*sizeof(float));
+    offset += set_size[i];
+  }
+}
+
+void APAM::
+pack_g(float *g) {
   float *tg = NULL;
   int offset = 0;
   for (int i = 0; i < num_set; i++) {
@@ -218,6 +230,10 @@ void train_master(Net& model,
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nranks);
 
+  // master and workers should use the same initialization
+  optimizer.pack_w(w);
+  MPI_Bcast(w, N, MPI_FLOAT, ROOT, MPI_COMM_WORLD);
+  
   // initiate nonblocking receives from all workers
   MPI_Request *recv_request = NULL;
   recv_request = new MPI_Request [nranks];
@@ -278,7 +294,7 @@ void train_master(Net& model,
 
       // print training set loss and accuracy (time consuming)
       if (check_progress && counter % num_iter_per_epoch == 0) {
-        optimizer.unpack(w);
+        optimizer.unpack_w(w);
         int epoch_number = counter / num_iter_per_epoch;
         printf("process %d: Train epoch %d [%d/%d]\n",
                myrank, epoch_number, counter, maxiter);
@@ -323,7 +339,7 @@ void train_master(Net& model,
   }
 
   // copy final w in the communication buffer to model
-  optimizer.unpack(w);
+  optimizer.unpack_w(w);
   
   // clean up
   delete [] recv_request;
@@ -349,11 +365,14 @@ void train_worker(Net& model,
   int myrank;
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
+  // master and workers should use the same initialization
+  MPI_Bcast(w, N, MPI_FLOAT, ROOT, MPI_COMM_WORLD);
+  // optimizer.unpack_w(w); // no need; done in a few lines later
+  
   // set the mode to train (affects dropout, batchnorm, etc)
   model.train();
 
   // while loop
-  bool initial = true;
   while (1) {
 
     // compute new g based on the current w
@@ -363,12 +382,7 @@ void train_worker(Net& model,
       auto data = batch.data.to(device), target = batch.target.to(device);
       
       // use w in the communication buffer to set parameters in model
-      if (!initial) {
-        optimizer.unpack(w);
-      }
-      initial = false;
-      // [black art] for unknown reasons, using the initial w in the
-      // communication buffer to set parameters in model does not work
+      optimizer.unpack_w(w);
        
       // reset gradient
       optimizer.zero_grad();
@@ -381,7 +395,7 @@ void train_worker(Net& model,
       loss.backward();
 
       // extract gradient to communication buffer g
-      optimizer.pack(g);
+      optimizer.pack_g(g);
       
       // ensure that the loop is iterated only once, because we need
       // only one random batch
