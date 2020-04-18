@@ -54,10 +54,10 @@ public:
   ~APAM();
 
   // the meat
-  void unpack_w(float *w); // unpack from float array to tensor
-  void pack_w(float *w);   // pack from tensor to float array
-  void pack_g(float *g);   // pack from tensor to float array
-  void zero_grad(void);    // called by worker. conform with pytorch
+  void unpack_w(float *w);       // unpack from float array to tensor
+  void pack_w(float *w);         // pack from tensor to float array
+  void pack_g(float *g);         // pack from tensor to float array
+  void zero_grad(void);          // called by worker. conform with pytorch
   void step(float *g, float *w); // called by master. conform with pytorch
 
   // utility functions
@@ -218,7 +218,11 @@ void train_master(Net& model,
                   int N,
                   int maxiter,
                   int num_iter_per_epoch,
-                  bool screen_debug,
+                  bool debug_comm,
+                  bool debug_time,
+                  std::string debug_time_outfile,
+                  bool debug_grad,
+                  std::string debug_grad_outfile,
                   bool check_progress) {
 
   // mpi context
@@ -226,6 +230,15 @@ void train_master(Net& model,
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nranks);
 
+  // debug timing (will output timing information to file)
+  clock_t time1, time2;
+  int *elapse = NULL;
+  int elapse_count = 0;
+  if (debug_time) {
+    time1 = clock();
+    elapse = new int [(maxiter+nranks)*3];
+  }
+  
   // master and workers should use the same initialization
   optimizer.pack_w(w);
   MPI_Bcast(w, N, MPI_FLOAT, ROOT, MPI_COMM_WORLD);
@@ -251,6 +264,15 @@ void train_master(Net& model,
     test(model, device, dataloader, dataset_size, "train set");
   }
   
+  // debug gradient history (will output gradient history to file)
+  int *which_worker = NULL;
+  int *num_grad_this_wait = NULL;
+  int num_wait = 0;
+  if (debug_grad) {
+    which_worker = new int [maxiter+nranks];
+    num_grad_this_wait = new int [maxiter+nranks];
+  }
+  
   // prepare for while loop
   int num_active_workers = nranks - 1;
   int counter = 0;
@@ -269,8 +291,15 @@ void train_master(Net& model,
       printf("master %d: Error in MPI_Waitsome!", myrank); exit(1);
     }
 
-    // screen debug
-    if (screen_debug) {
+    // debug timing
+    if (debug_time) {
+      time2 = clock();
+      elapse[elapse_count++] = time2 - time1;
+      time1 = time2;
+    }
+
+    // debug communication
+    if (debug_comm) {
       printf("master %d: received %d new g from ranks [ ", myrank, nreceived);
       for (int i = 0; i < nreceived; i++) {
         printf("%d ", idx_of_received[i]);
@@ -278,6 +307,14 @@ void train_master(Net& model,
       printf("]\n");
       if (nreceived <= 0) {
         nreceived = 0;
+      }
+    }
+    
+    // debug gradient history
+    if (debug_grad) {
+      num_grad_this_wait[num_wait++] = nreceived;
+      for (int i = 0; i < nreceived; i++) {
+        which_worker[counter+i] = idx_of_received[i];
       }
     }
 
@@ -298,9 +335,16 @@ void train_master(Net& model,
       }
     }
     
-    // screen debug
-    if (screen_debug) {
+    // debug communication
+    if (debug_comm) {
       printf("master %d: total number of digested g = %d\n", myrank, counter);
+    }
+    
+    // debug timing
+    if (debug_time) {
+      time2 = clock();
+      elapse[elapse_count++] = time2 - time1;
+      time1 = time2;
     }
     
     // send new w to select workers and post new nonblocking receives
@@ -332,12 +376,52 @@ void train_master(Net& model,
         num_active_workers--;
       }
     }
+
+    // debug timing
+    if (debug_time) {
+      time2 = clock();
+      elapse[elapse_count++] = time2 - time1;
+      time1 = time2;
+    }
   }
 
   // copy final w in the communication buffer to model
   optimizer.unpack_w(w);
+
+  // debug timing: output timing information to file
+  FILE *fp = NULL;
+  if (debug_time) {
+    fp = fopen(debug_time_outfile.c_str(), "w");
+    for (int i = 0; i < elapse_count; i++) {
+      fprintf(fp, "%d ", elapse[i]);
+      if ((i+1)%3 == 0) {
+        fprintf(fp, "\n");
+      }
+    }
+    fclose(fp);
+  }
   
+  // debug gradient history: output gradient history to file
+  if (debug_grad) {
+    fp = fopen(debug_grad_outfile.c_str(), "w");
+    int *which_worker_ptr = which_worker;
+    for (int i = 0; i < num_wait; i++) {
+      for (int j = 0; j < num_grad_this_wait[i]; j++) {
+        fprintf(fp, "%d ", *which_worker_ptr++);
+      }
+      fprintf(fp, "\n");
+    }
+    fclose(fp);
+  }
+
   // clean up
+  if (debug_time) {
+    delete [] elapse;
+  }
+  if (debug_grad) {
+    delete [] which_worker;
+    delete [] num_grad_this_wait;
+  }
   delete [] recv_request;
   delete [] idx_of_received;
   delete [] status_of_received;
@@ -354,7 +438,7 @@ void train_worker(Net& model,
                   float *g,
                   float *w,
                   int N,
-                  bool screen_debug,
+                  bool debug_comm,
                   bool check_progress) {
 
   MPI_Status status;
@@ -410,8 +494,8 @@ void train_worker(Net& model,
       printf("worker %d: Error in MPI_Recv!", myrank); exit(1);
     }
 
-    // screen debug
-    if (screen_debug) {
+    // debug communication
+    if (debug_comm) {
       printf("worker %d: received w from master. "
              "status.MPI_SOURCE = %d, status.MPI_TAG = %d\n",
              myrank, status.MPI_SOURCE, status.MPI_TAG);
@@ -472,8 +556,12 @@ int main(int argc, char **argv) {
   size_t train_batch_size = 128;
   size_t test_batch_size = 1000;
   size_t num_epochs = 20;
-  bool screen_debug = false;
-  bool timing = true;
+  bool debug_comm = false; // if true, debugging info will print to screen
+  bool debug_time = false; // if true, debugging info will print to file
+  std::string debug_time_outfile = "debug_logit_time.txt";
+  bool debug_grad = false; // if true, debugging info will print to file
+  std::string debug_grad_outfile = "debug_logit_grad.txt";
+  bool timing = true; // if false, will compute training error each epoch
 
   // pytorch setup
   size_t seed = myrank;                   // seed
@@ -518,12 +606,13 @@ int main(int argc, char **argv) {
   clock_t time_start = clock();
   if (myrank == ROOT) {
     train_master(model, device, *train_loader, train_dataset_size, optimizer,
-                 gg, w, N, maxiter, num_iter_per_epoch, screen_debug,
+                 gg, w, N, maxiter, num_iter_per_epoch, debug_comm, debug_time,
+                 debug_time_outfile, debug_grad, debug_grad_outfile,
                  check_progress);
   }
   else {
     train_worker(model, device, *train_loader, train_dataset_size, optimizer,
-                 g, w, N, screen_debug, check_progress);
+                 g, w, N, debug_comm, check_progress);
   }
   clock_t time_end = clock();
 
