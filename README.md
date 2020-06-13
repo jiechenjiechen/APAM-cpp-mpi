@@ -6,6 +6,8 @@ For the C++-OpenMP code, see [https://github.com/xu-yangyang/APAM](https://githu
 
 ## Usage
 
+Make sure you have cmake with version >= 3.1 and a C++ compiler that supports C++14 standard.
+
 Install MPI as needed. Example on Ubuntu Linux with OpenMPI:
 
 ```sh
@@ -27,10 +29,10 @@ cd build
 cmake -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_PREFIX_PATH=/absolute/path/to/libtorch ..
 ```
 
-Compile the code.  Example with `apam_mpi_logit_mnist`:
+Compile the code.  Example with `apam_mpi_lenet5_mnist`:
 
 ```sh
-make apam_mpi_logit_mnist
+make apam_mpi_lenet5_mnist
 ```
 
 or, if you want to compile all executables:
@@ -39,46 +41,46 @@ or, if you want to compile all executables:
 make
 ```
 
-Run the code. Example running `apam_mpi_logit_mnist`, by using 4 mpi processes (1 master and 3 workers), each of which uses only 1 thread, under bash:
+Run the code. Example running `apam_mpi_lenet5_mnist`, by using 4 mpi processes (1 master and 3 workers), each of which uses only 1 thread, under bash:
 
 ```sh
-OMP_NUM_THREADS=1 mpirun -np 4 apam_mpi_logit_mnist
+OMP_NUM_THREADS=1 mpirun -np 4 apam_mpi_lenet5_mnist
 ```
 
 ## Performance
 
-Performance of `apam_mpi_logit_mnist` on a few machines:
+Performance of `apam_mpi_lenet5_mnist` on a few machines:
 
 On Ubuntu Linux 5.3.0-28.30~18.04.1, Intel(R) Xeon(R) CPU X5677 @ 3.47GHz, 8 cores, no GPU, OpenMPI 2.1.1
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.2769    | 92.15%        | 43.465           | 1.00    |
-| 2         | 0.2776    | 92.18%        | 22.344           | 1.94    |
-| 3         | 0.2780    | 92.05%        | 16.456           | 2.64    |
-| 4         | 0.2777    | 92.13%        | 14.411           | 3.01    |
-| 5         | 0.2786    | 92.10%        | 12.635           | 3.44    |
-| 6         | 0.2793    | 92.10%        | 11.308           | 3.84    |
-| 7         | 0.2779    | 92.14%        | 10.155           | 4.28    |
+| 1         | 0.0336    | 98.96%        | 1104.6           | 1.00    |
+| 2         | 0.0396    | 98.93%        | 580.97           | 1.90    |
+| 3         | 0.0344    | 98.94%        | 422.01           | 2.61    |
+| 4         | 0.0344    | 98.92%        | 348.05           | 3.17    |
+| 5         | 0.0351    | 98.94%        | 324.27           | 3.40    |
+| 6         | 0.0357    | 98.91%        | 292.87           | 3.77    |
+| 7         | 0.0337    | 98.90%        | 270.57           | 4.08    |
 
 On Ubuntu Linux 4.4.0-169, Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz, 64 cores, no GPU, MPICH 3.2
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.2769    | 92.15%        | 43.999           | 1.00    |
-| 2         | 0.2776    | 92.09%        | 21.388           | 2.05    |
-| 4         | 0.2787    | 92.23%        | 11.366           | 3.87    |
-| 8         | 0.2769    | 92.23%        | 5.8701           | 7.49    |
-| 16        | 0.2797    | 91.98%        | 2.7817           | 15.81   |
-| 32        | 0.2873    | 91.95%        | 1.7131           | 25.68   |
+| 1         | 0.0327    | 99.01%        | 451.86           | 1.00    |
+| 2         | 0.0357    | 98.82%        | 232.47           | 1.94    |
+| 4         | 0.0375    | 98.90%        | 125.20           | 3.60    |
+| 8         | 0.0347    | 98.95%        | 64.225           | 7.03    |
+| 16        | 0.0342    | 98.85%        | 33.285           | 13.57   |
+| 32        | 0.0406    | 98.67%        | 17.882           | 25.26   |
 
 On macOS 10.15.1, 2.7 GHz Quad-Core Intel Core i7, no GPU, OpenMPI 4.0.2
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.2769    | 92.15%        | 26.661           | 1.00    |
-| 2         | 0.2774    | 92.11%        | 13.531           | 1.97    |
-| 3         | 0.2779    | 92.05%        | 9.4176           | 2.83    |
+| 1         | 0.0329    | 99.03%        | 376.11           | 1.00    |
+| 2         | 0.0378    | 98.87%        | 200.80           | 1.87    |
+| 3         | 0.0334    | 98.95%        | 149.17           | 2.52    |
 
 <!--- More results here
 
@@ -88,65 +90,65 @@ On Ubuntu Linux 5.3.0-28.30~18.04.1, Intel(R) Xeon(R) CPU X5677 @ 3.47GHz, 8 cor
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0650    | 98.21%        | 194.00           | 1.00    |
-| 2         | 0.0620    | 98.41%        | 106.26           | 1.82    |
-| 3         | 0.0624    | 98.33%        | 83.592           | 2.32    |
-| 4         | 0.0623    | 98.33%        | 98.080           | 1.97    |
-| 5         | 0.0629    | 98.38%        | 117.23           | 1.65    |
-| 6         | 0.0611    | 98.26%        | 126.05           | 1.53    |
-| 7         | 0.0659    | 98.19%        | 146.99           | 1.31    |
+| 1         | 0.0650    | 98.21%        | 193.54           | 1.00    |
+| 2         | 0.0611    | 98.42%        | 103.31           | 1.87    |
+| 3         | 0.0607    | 98.38%        | 86.580           | 2.23    |
+| 4         | 0.0617    | 98.36%        | 95.263           | 2.03    |
+| 5         | 0.0615    | 98.29%        | 122.34           | 1.58    |
+| 6         | 0.0653    | 98.28%        | 128.94           | 1.50    |
+| 7         | 0.0646    | 98.19%        | 130.90           | 1.47    |
 
 On Ubuntu Linux 4.4.0-169, Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz, 64 cores, no GPU, MPICH 3.2
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0655    | 98.31%        | 97.672           | 1.00    |
-| 2         | 0.0620    | 98.40%        | 51.653           | 1.89    |
-| 4         | 0.0619    | 98.37%        | 29.737           | 3.28    |
-| 8         | 0.0744    | 98.01%        | 28.667           | 3.40    |
-| 16        | 0.0740    | 97.86%        | 29.776           | 3.28    |
-| 32        | 0.1546    | 95.27%        | 32.792           | 2.97    |
+| 1         | 0.0655    | 98.31%        | 97.639           | 1.00    |
+| 2         | 0.0629    | 98.43%        | 50.844           | 1.92    |
+| 4         | 0.0630    | 98.42%        | 28.892           | 3.37    |
+| 8         | 0.0647    | 98.25%        | 27.784           | 3.51    |
+| 16        | 0.0727    | 97.81%        | 27.966           | 3.49    |
+| 32        | 0.1615    | 95.09%        | 32.528           | 3.00    |
 
 On macOS 10.15.1, 2.7 GHz Quad-Core Intel Core i7, no GPU, OpenMPI 4.0.2
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0644    | 98.26%        | 78.676           | 1.00    |
-| 2         | 0.0624    | 98.40%        | 42.913           | 1.83    |
-| 3         | 0.0617    | 98.38%        | 32.674           | 2.40    |
+| 1         | 0.0644    | 98.26%        | 79.470           | 1.00    |
+| 2         | 0.0650    | 98.29%        | 43.496           | 1.82    |
+| 3         | 0.0605    | 98.29%        | 34.900           | 2.27    |
 
-Performance of `apam_mpi_lenet5_mnist` on a few machines
+Performance of `apam_mpi_logit_mnist` on a few machines
 
 On Ubuntu Linux 5.3.0-28.30~18.04.1, Intel(R) Xeon(R) CPU X5677 @ 3.47GHz, 8 cores, no GPU, OpenMPI 2.1.1
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0436    | 98.91%        | 558.33           | 1.00    |
-| 2         | 0.0373    | 99.10%        | 289.96           | 1.92    |
-| 3         | 0.0412    | 98.97%        | 216.46           | 2.57    |
-| 4         | 0.0464    | 98.94%        | 174.65           | 3.19    |
-| 5         | 0.0453    | 98.83%        | 162.76           | 3.43    |
-| 6         | 0.0556    | 98.41%        | 143.95           | 3.87    |
-| 7         | 0.0461    | 98.75%        | 134.34           | 4.15    |
+| 1         | 0.2769    | 92.15%        | 43.241           | 1.00    |
+| 2         | 0.2778    | 92.17%        | 22.890           | 1.88    |
+| 3         | 0.2792    | 92.06%        | 16.946           | 2.55    |
+| 4         | 0.2783    | 92.22%        | 14.309           | 3.02    |
+| 5         | 0.2782    | 92.13%        | 12.622           | 3.42    |
+| 6         | 0.2787    | 92.13%        | 11.332           | 3.81    |
+| 7         | 0.2776    | 92.24%        | 10.186           | 4.24    |
 
 On Ubuntu Linux 4.4.0-169, Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz, 64 cores, no GPU, MPICH 3.2
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0431    | 99.02%        | 231.92           | 1.00    |
-| 2         | 0.0428    | 98.82%        | 117.22           | 1.97    |
-| 4         | 0.0402    | 99.02%        | 62.368           | 3.71    |
-| 8         | 0.0370    | 98.87%        | 31.682           | 7.32    |
-| 16        | 0.0587    | 98.34%        | 16.412           | 14.13   |
-| 32        | 2.3013    | 11.35%        | 9.0915           | 25.50   |
+| 1         | 0.2769    | 92.15%        | 43.633           | 1.00    |
+| 2         | 0.2783    | 92.18%        | 23.890           | 1.82    |
+| 4         | 0.2791    | 91.93%        | 11.608           | 3.75    |
+| 8         | 0.2782    | 92.18%        | 5.8105           | 7.50    |
+| 16        | 0.2784    | 92.25%        | 2.8638           | 15.23   |
+| 32        | 0.2869    | 92.02%        | 1.8435           | 23.66   |
 
 On macOS 10.15.1, 2.7 GHz Quad-Core Intel Core i7, no GPU, OpenMPI 4.0.2
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0440    | 98.91%        | 185.08           | 1.00    |
-| 2         | 0.0442    | 98.96%        | 98.923           | 1.87    |
-| 3         | 0.0410    | 98.96%        | 71.099           | 2.60    |
+| 1         | 0.2769    | 92.15%        | 26.245           | 1.00    |
+| 2         | 0.2773    | 92.12%        | 13.471           | 1.94    |
+| 3         | 0.2787    | 92.14%        | 9.3800           | 2.79    |
 
 -->
 
