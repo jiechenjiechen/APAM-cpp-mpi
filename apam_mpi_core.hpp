@@ -5,10 +5,13 @@
 // pytorch data types (e.g., torch::Tensor), because pytorch has an
 // mpi interface handling such.
 
-#ifndef _APAM_MPI_
-#define _APAM_MPI_
+#ifndef _APAM_MPI_CORE_
+#define _APAM_MPI_CORE_
 
 #include <mpi.h>
+#ifdef USE_OPENMP
+#include <omp.h>
+#endif
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -269,6 +272,9 @@ step(float *g, float *w) {
   double one_minus_beta1 = 1 - _beta1;
   double one_minus_beta2 = 1 - _beta2;
   if (_sparse_g == false) { // full gradient
+#ifdef USE_OPENMP
+#pragma omp parallel for
+#endif
     for (int i = 0; i < num_param; i++) {
       m[i] = _beta1 * m[i] + one_minus_beta1 * g[i];
       v[i] = _beta2 * v[i] + one_minus_beta2 * g[i] * g[i];
@@ -339,13 +345,13 @@ void train_master(Net& model,
                   int maxiter,
                   int num_iter_per_epoch,
                   bool use_sparse,
-                  bool debug_sparse,
-                  std::string debug_sparse_outfile,
                   bool debug_comm,
+                  bool debug_sparse,
+                  const char* debug_sparse_outfile,
                   bool debug_time,
-                  std::string debug_time_outfile,
+                  const char* debug_time_outfile,
                   bool debug_grad,
-                  std::string debug_grad_outfile,
+                  const char* debug_grad_outfile,
                   bool check_progress) {
 
   // mpi context
@@ -367,11 +373,11 @@ void train_master(Net& model,
   w = new float [N];
 
   // debug timing (will output timing information to file)
-  clock_t time1, time2;
+  double time1, time2;
   int *elapse = NULL;
   int elapse_count = 0;
   if (debug_time) {
-    time1 = clock();
+    time1 = MPI_Wtime();
     elapse = new int [(maxiter+nranks)*3];
   }
   
@@ -440,7 +446,7 @@ void train_master(Net& model,
 
     // debug timing
     if (debug_time) {
-      time2 = clock();
+      time2 = MPI_Wtime();
       elapse[elapse_count++] = time2 - time1;
       time1 = time2;
     }
@@ -496,12 +502,15 @@ void train_master(Net& model,
     
     // debug timing
     if (debug_time) {
-      time2 = clock();
+      time2 = MPI_Wtime();
       elapse[elapse_count++] = time2 - time1;
       time1 = time2;
     }
     
     // send new w to select workers and post new nonblocking receives
+#ifdef USE_OPENMP
+#pragma omp parallel for
+#endif
     for (int i = 0; i < nreceived; i++) {
       if (counter < maxiter) { // if not done
 
@@ -533,7 +542,7 @@ void train_master(Net& model,
 
     // debug timing
     if (debug_time) {
-      time2 = clock();
+      time2 = MPI_Wtime();
       elapse[elapse_count++] = time2 - time1;
       time1 = time2;
     }
@@ -545,7 +554,7 @@ void train_master(Net& model,
   // debug timing: output timing information to file
   FILE *fp = NULL;
   if (debug_time) {
-    fp = fopen(debug_time_outfile.c_str(), "w");
+    fp = fopen(debug_time_outfile, "w");
     for (int i = 0; i < elapse_count; i++) {
       fprintf(fp, "%d ", elapse[i]);
       if ((i+1)%3 == 0) {
@@ -557,7 +566,7 @@ void train_master(Net& model,
   
   // debug gradient history: output gradient history to file
   if (debug_grad) {
-    fp = fopen(debug_grad_outfile.c_str(), "w");
+    fp = fopen(debug_grad_outfile, "w");
     int *which_worker_ptr = which_worker;
     for (int i = 0; i < num_wait; i++) {
       for (int j = 0; j < num_grad_this_wait[i]; j++) {
@@ -570,7 +579,7 @@ void train_master(Net& model,
 
   // debug gradient sparsity: output relative msg length to file
   if (use_sparse && debug_sparse) {
-    fp = fopen(debug_sparse_outfile.c_str(), "w");
+    fp = fopen(debug_sparse_outfile, "w");
     for (int i = 0; i < counter; i++) {
       fprintf(fp, "%f\n", rel_msg_len[i]);
     }
