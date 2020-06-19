@@ -1,12 +1,30 @@
 # APAM: Asynchronous Parallel Adaptive stochastic gradient Method
 
-This repository contains a C++-MPI implementation of APAM [(Xu et al. 2020)](#Xu2020).
+This repository contains a C++-MPI implementation of APAM [(Xu et al. 2020)](#Xu2020). It supports MPI/OpenMP hybrid parallelism.
 
 For the C++-OpenMP code, see [https://github.com/xu-yangyang/APAM](https://github.com/xu-yangyang/APAM).
 
-## Usage
+## Prerequisites
 
-Make sure you have cmake with version >= 3.1 and a C++ compiler that supports C++14 standard.
+- CMake, version >= 3.1
+- C++ compiler with C++14 standard support
+- (optional) C++ compiler with OpenMP support
+
+The configuration by default assumes using OpenMP. If you do not want to, or cannot, use OpenMP, change the following line in `CMakeLists.txt` from
+
+```
+option(USE_OPENMP "If has OpenMP and use OpenMP" ON)
+```
+
+to
+
+```
+option(USE_OPENMP "If has OpenMP and use OpenMP" OFF)
+```
+
+Hint: The purpose of using OpenMP is to allow multithreading for the master. If you use only one thread for the master, not invoking OpenMP will save you from threading overhead.
+
+## Usage
 
 Install MPI as needed. Example on Ubuntu Linux with OpenMPI:
 
@@ -41,114 +59,114 @@ or, if you want to compile all executables:
 make
 ```
 
-Run the code. Example running `apam_mpi_lenet5_mnist`, by using 4 mpi processes (1 master and 3 workers), each of which uses only 1 thread, under bash:
+Run the code. Example running `apam_mpi_lenet5_mnist`, by using 4 mpi processes (1 master and 3 workers) with an initial learning rate 1e-4 and 40 epochs:
 
 ```sh
-OMP_NUM_THREADS=1 mpirun -np 4 apam_mpi_lenet5_mnist
+OMP_NUM_THREADS=1 mpirun -np 4 apam_mpi_lenet5_mnist --lr 1e-4 --num_epochs 40
 ```
+
+The purpose of setting the environment variable `OMP_NUM_THREADS=1` is to ensure that any libtorch related function call uses one thread. Besides libtorch calls, the master and each worker may use several threads to perform other calculations. In practice, each worker uses one thread, but the master may need to use several threads to empower itself for faster gradient digestion and communication. The number of threads for the master may be set through command line option `--master_num_threads`.
+
+For all available command line options, see the beginning of `apam_mpi_main.cpp`. They are self-explanatory. The command line option syntax follows the POSIX standard.
+
+Note: If the compiler does not have OpenMP support, setting `--master_num_threads` takes no effect.
 
 ## Performance
 
-Performance of `apam_mpi_lenet5_mnist` on a few machines:
+Performance of `apam_mpi_lenet5_mnist` on a few machines is listed in the following. The option list is `--lr 1e-4 --num_epochs 40`.
 
-On Ubuntu Linux 5.3.0-28.30~18.04.1, Intel(R) Xeon(R) CPU X5677 @ 3.47GHz, 8 cores, no GPU, OpenMPI 2.1.1
-
-| # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
-| :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0336    | 98.96%        | 1104.6           | 1.00    |
-| 2         | 0.0396    | 98.93%        | 580.97           | 1.90    |
-| 3         | 0.0344    | 98.94%        | 422.01           | 2.61    |
-| 4         | 0.0344    | 98.92%        | 348.05           | 3.17    |
-| 5         | 0.0351    | 98.94%        | 324.27           | 3.40    |
-| 6         | 0.0357    | 98.91%        | 292.87           | 3.77    |
-| 7         | 0.0337    | 98.90%        | 270.57           | 4.08    |
-
-On Ubuntu Linux 4.4.0-169, Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz, 64 cores, no GPU, MPICH 3.2
+On Ubuntu Linux 5.3.0-28.30~18.04.1, Intel(R) Xeon(R) CPU X5677 @ 3.47GHz, 8 cores, no GPU, gcc 7.5.0 with OpenMP, OpenMPI 2.1.1:
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0327    | 99.01%        | 451.86           | 1.00    |
-| 2         | 0.0357    | 98.82%        | 232.47           | 1.94    |
-| 4         | 0.0375    | 98.90%        | 125.20           | 3.60    |
-| 8         | 0.0347    | 98.95%        | 64.225           | 7.03    |
-| 16        | 0.0342    | 98.85%        | 33.285           | 13.57   |
-| 32        | 0.0406    | 98.67%        | 17.882           | 25.26   |
+| 1         | 0.0336    | 98.96%        | 1114.4           | 1.00    |
+| 2         | 0.0339    | 98.93%        | 567.16           | 1.96    |
+| 3         | 0.0355    | 98.88%        | 434.35           | 2.56    |
+| 4         | 0.0346    | 98.98%        | 359.02           | 3.10    |
+| 5         | 0.0351    | 99.02%        | 319.17           | 3.49    |
+| 6         | 0.0367    | 98.90%        | 289.73           | 3.84    |
 
-On macOS 10.15.1, 2.7 GHz Quad-Core Intel Core i7, no GPU, OpenMPI 4.0.2
+On Ubuntu Linux 4.4.0-169, Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz, 64 cores, no GPU, gcc 5.4.0 with OpenMP, MPICH 3.2:
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0329    | 99.03%        | 376.11           | 1.00    |
-| 2         | 0.0378    | 98.87%        | 200.80           | 1.87    |
-| 3         | 0.0334    | 98.95%        | 149.17           | 2.52    |
+| 1         | 0.0327    | 99.01%        | 460.58           | 1.00    |
+| 2         | 0.0389    | 98.86%        | 228.72           | 2.01    |
+| 4         | 0.0359    | 98.95%        | 121.85           | 3.77    |
+| 8         | 0.0343    | 98.99%        | 60.894           | 7.56    |
+| 16        | 0.0365    | 98.86%        | 32.764           | 14.05   |
+| 32        | 0.0468    | 98.50%        | 17.856           | 25.79   |
+
+On macOS 10.15.1, 2.7 GHz Quad-Core Intel Core i7, no GPU, Apple clang 11.0.3 without OpenMP, OpenMPI 4.0.4:
+
+| # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
+| :-------: | :-------: | :-----------: | :--------------: | :-----: |
+| 1         | 0.0329    | 99.03%        | 395.60           | 1.00    |
+| 2         | 0.0365    | 98.89%        | 211.69           | 1.86    |
+| 3         | 0.0364    | 98.83%        | 157.65           | 2.50    |
 
 <!--- More results here
 
-Performance of `apam_mpi_mlp_mnist` on a few machines
+Performance of `apam_mpi_mlp_mnist ` on a few machines is listed in the following. The option `--master_num_threads` is set as the number of processes minus 1.
 
-On Ubuntu Linux 5.3.0-28.30~18.04.1, Intel(R) Xeon(R) CPU X5677 @ 3.47GHz, 8 cores, no GPU, OpenMPI 2.1.1
-
-| # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
-| :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0650    | 98.21%        | 193.54           | 1.00    |
-| 2         | 0.0611    | 98.42%        | 103.31           | 1.87    |
-| 3         | 0.0607    | 98.38%        | 86.580           | 2.23    |
-| 4         | 0.0617    | 98.36%        | 95.263           | 2.03    |
-| 5         | 0.0615    | 98.29%        | 122.34           | 1.58    |
-| 6         | 0.0653    | 98.28%        | 128.94           | 1.50    |
-| 7         | 0.0646    | 98.19%        | 130.90           | 1.47    |
-
-On Ubuntu Linux 4.4.0-169, Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz, 64 cores, no GPU, MPICH 3.2
+On Ubuntu Linux 5.3.0-28.30~18.04.1, Intel(R) Xeon(R) CPU X5677 @ 3.47GHz, 8 cores, no GPU, gcc 7.5.0 with OpenMP, OpenMPI 2.1.1, `--master_num_threads` set as np-1:
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0655    | 98.31%        | 97.639           | 1.00    |
-| 2         | 0.0629    | 98.43%        | 50.844           | 1.92    |
-| 4         | 0.0630    | 98.42%        | 28.892           | 3.37    |
-| 8         | 0.0647    | 98.25%        | 27.784           | 3.51    |
-| 16        | 0.0727    | 97.81%        | 27.966           | 3.49    |
-| 32        | 0.1615    | 95.09%        | 32.528           | 3.00    |
+| 1         | 0.0650    | 98.21%        | 192.37           | 1.00    |
+| 2         | 0.0629    | 98.26%        | 91.125           | 2.11    |
+| 3         | 0.0613    | 98.38%        | 72.611           | 2.64    |
 
-On macOS 10.15.1, 2.7 GHz Quad-Core Intel Core i7, no GPU, OpenMPI 4.0.2
+On Ubuntu Linux 4.4.0-169, Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz, 64 cores, no GPU, gcc 5.4.0 with OpenMP, MPICH 3.2, `--master_num_threads` set as min(np-1,8):
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.0644    | 98.26%        | 79.470           | 1.00    |
-| 2         | 0.0650    | 98.29%        | 43.496           | 1.82    |
-| 3         | 0.0605    | 98.29%        | 34.900           | 2.27    |
+| 1         | 0.0655    | 98.31%        | 97.739           | 1.00    |
+| 2         | 0.0639    | 98.40%        | 49.955           | 1.95    |
+| 4         | 0.0619    | 98.41%        | 23.543           | 4.15    |
+| 8         | 0.0681    | 98.16%        | 12.639           | 7.73    |
+| 16        | 0.0780    | 97.63%        | 16.604           | 5.88    |
+| 32        | 0.1325    | 95.87%        | 25.474           | 3.83    |
 
-Performance of `apam_mpi_logit_mnist` on a few machines
-
-On Ubuntu Linux 5.3.0-28.30~18.04.1, Intel(R) Xeon(R) CPU X5677 @ 3.47GHz, 8 cores, no GPU, OpenMPI 2.1.1
-
-| # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
-| :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.2769    | 92.15%        | 43.241           | 1.00    |
-| 2         | 0.2778    | 92.17%        | 22.890           | 1.88    |
-| 3         | 0.2792    | 92.06%        | 16.946           | 2.55    |
-| 4         | 0.2783    | 92.22%        | 14.309           | 3.02    |
-| 5         | 0.2782    | 92.13%        | 12.622           | 3.42    |
-| 6         | 0.2787    | 92.13%        | 11.332           | 3.81    |
-| 7         | 0.2776    | 92.24%        | 10.186           | 4.24    |
-
-On Ubuntu Linux 4.4.0-169, Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz, 64 cores, no GPU, MPICH 3.2
+On macOS 10.15.1, 2.7 GHz Quad-Core Intel Core i7, no GPU, Apple clang 11.0.3 without OpenMP, OpenMPI 4.0.4, `--master_num_threads` set as 1:
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.2769    | 92.15%        | 43.633           | 1.00    |
-| 2         | 0.2783    | 92.18%        | 23.890           | 1.82    |
-| 4         | 0.2791    | 91.93%        | 11.608           | 3.75    |
-| 8         | 0.2782    | 92.18%        | 5.8105           | 7.50    |
-| 16        | 0.2784    | 92.25%        | 2.8638           | 15.23   |
-| 32        | 0.2869    | 92.02%        | 1.8435           | 23.66   |
+| 1         | 0.0644    | 98.26%        | 86.399           | 1.00    |
+| 2         | 0.0617    | 98.43%        | 45.326           | 1.90    |
+| 3         | 0.0618    | 98.37%        | 37.985           | 2.27    |
 
-On macOS 10.15.1, 2.7 GHz Quad-Core Intel Core i7, no GPU, OpenMPI 4.0.2
+Performance of `apam_mpi_logit_mnist ` on a few machines is listed in the following. The option list is `--lr 1e-4`.
+
+On Ubuntu Linux 5.3.0-28.30~18.04.1, Intel(R) Xeon(R) CPU X5677 @ 3.47GHz, 8 cores, no GPU, gcc 7.5.0 with OpenMP, OpenMPI 2.1.1:
 
 | # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
 | :-------: | :-------: | :-----------: | :--------------: | :-----: |
-| 1         | 0.2769    | 92.15%        | 26.245           | 1.00    |
-| 2         | 0.2773    | 92.12%        | 13.471           | 1.94    |
-| 3         | 0.2787    | 92.14%        | 9.3800           | 2.79    |
+| 1         | 0.2769    | 92.15%        | 44.669           | 1.00    |
+| 2         | 0.2770    | 92.26%        | 22.508           | 1.98    |
+| 3         | 0.2787    | 92.08%        | 17.768           | 2.51    |
+| 4         | 0.2776    | 92.13%        | 15.154           | 2.94    |
+| 5         | 0.2776    | 92.22%        | 13.047           | 3.42    |
+| 6         | 0.2784    | 92.12%        | 11.810           | 3.78    |
+
+On Ubuntu Linux 4.4.0-169, Intel(R) Xeon(R) Gold 6130 CPU @ 2.10GHz, 64 cores, no GPU, gcc 5.4.0 with OpenMP, MPICH 3.2:
+
+| # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
+| :-------: | :-------: | :-----------: | :--------------: | :-----: |
+| 1         | 0.2769    | 92.15%        | 45.956           | 1.00    |
+| 2         | 0.2771    | 92.17%        | 23.699           | 1.93    |
+| 4         | 0.2779    | 92.17%        | 11.114           | 4.13    |
+| 8         | 0.2777    | 92.10%        | 5.5981           | 8.20    |
+| 16        | 0.2794    | 92.23%        | 3.0756           | 14.94   |
+| 32        | 0.2843    | 92.08%        | 1.9339           | 23.76   |
+
+On macOS 10.15.1, 2.7 GHz Quad-Core Intel Core i7, no GPU, Apple clang 11.0.3 without OpenMP, OpenMPI 4.0.4:
+
+| # Workers | Test loss | Test accuracy | Train time (sec) | Speedup |
+| :-------: | :-------: | :-----------: | :--------------: | :-----: |
+| 1         | 0.2769    | 92.15%        | 26.983           | 1.00    |
+| 2         | 0.2775    | 92.22%        | 13.800           | 1.95    |
+| 3         | 0.2788    | 92.13%        | 9.6875           | 2.78    |
 
 -->
 
