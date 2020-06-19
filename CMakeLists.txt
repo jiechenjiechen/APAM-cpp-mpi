@@ -3,7 +3,7 @@ project(apam_mpi)
 
 find_package(Torch REQUIRED)
 
-option(USE_OPENMP "If has OpenMP and use OpenMP" OFF)
+option(USE_OPENMP "If has OpenMP and use OpenMP" ON)
 
 if(USE_OPENMP)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fopenmp ${TORCH_CXX_FLAGS}")
